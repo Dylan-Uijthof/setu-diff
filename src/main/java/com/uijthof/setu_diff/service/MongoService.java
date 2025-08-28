@@ -60,7 +60,7 @@ public class MongoService {
         }
     }
 
-    public JsonPatch diffJsonFile(String id, MultipartFile newFile) throws IOException {
+    public JsonPatch diffJsonFiles(String id, MultipartFile newFile) throws IOException {
         Optional<Learning> existingLearningOptional = mongoRepo.findById(id);
         if (existingLearningOptional.isEmpty()) {
             throw new RuntimeException("Learning with id " + id + " not found");

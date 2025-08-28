@@ -1,5 +1,7 @@
 package com.uijthof.setu_diff.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.github.fge.jsonpatch.JsonPatch;
 import com.uijthof.setu_diff.service.MongoService;
 import com.uijthof.setu_diff.model.Learning;
 import lombok.AllArgsConstructor;
@@ -64,6 +66,22 @@ public class LearningController {
         EntitiesResponse response = new EntitiesResponse();
         response.setLearnings(data);
         return ResponseEntity.ok(response);
+    }
+    @PostMapping(
+            value = "/diff/{id}",
+            consumes = "multipart/form-data",
+            produces = "application/json")
+    public ResponseEntity<?> getJsonDiff(
+            @PathVariable("id") String id,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            JsonPatch diffResult = mongoService.diffJsonFiles(id, file);
+            return ResponseEntity.ok(diffResult);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Failed to process diff: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
 }
