@@ -1,0 +1,24 @@
+server:
+  port: 8443
+  servlet:
+    context-path:
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: setu-diff
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: learning
+
+springdoc:
+  version: 1.0.0
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+    groups-order: desc
