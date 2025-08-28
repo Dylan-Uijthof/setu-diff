@@ -1,6 +1,9 @@
 package com.uijthof.setu_diff.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.fge.jsonpatch.JsonPatch;
+import com.github.fge.jsonpatch.diff.JsonDiff;
 import com.uijthof.setu_diff.model.Learning;
 import com.uijthof.setu_diff.repo.MongoRepo;
 import lombok.AllArgsConstructor;
@@ -12,13 +15,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @AllArgsConstructor
 public class MongoService {
 
     private final MongoRepo mongoRepo;
-
     private final ObjectMapper objectMapper;
 
     public List<Learning> findAllLearnings() {
@@ -55,5 +58,21 @@ public class MongoService {
         } catch (IOException e)  {
             throw new RuntimeException("failed to read json data: " + e);
         }
+    }
+
+    public JsonPatch diffJsonFile(String id, MultipartFile newFile) throws IOException {
+        Optional<Learning> existingLearningOptional = mongoRepo.findById(id);
+        if (existingLearningOptional.isEmpty()) {
+            throw new RuntimeException("Learning with id " + id + " not found");
+        }
+        org.bson.Document oldDocument = existingLearningOptional.get().getDocument();
+        if (newFile.isEmpty()) {
+            throw new IllegalArgumentException("New json file is empty");
+        }
+        String newJsonContent = new String(newFile.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        JsonNode oldJsonNode = objectMapper.readTree(oldDocument.toJson());
+        JsonNode newjsonNode = objectMapper.readTree(newJsonContent);
+
+        return JsonDiff.asJsonPatch(oldJsonNode, newjsonNode);
     }
 }
