@@ -1,7 +1,5 @@
 package com.uijthof.setu_diff.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.github.fge.jsonpatch.JsonPatch;
 import com.uijthof.setu_diff.service.MongoService;
 import com.uijthof.setu_diff.model.Learning;
 import lombok.AllArgsConstructor;
@@ -11,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @AllArgsConstructor
@@ -75,7 +74,8 @@ public class LearningController {
             @PathVariable("id") String id,
             @RequestParam("file") MultipartFile file) {
         try {
-            JsonPatch diffResult = mongoService.diffJsonFiles(id, file);
+            // Verander het type van 'diffResult' om overeen te komen met de service
+            List<Map<String, Object>> diffResult = mongoService.diffJsonFiles(id, file);
             return ResponseEntity.ok(diffResult);
         } catch (RuntimeException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
