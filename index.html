@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Diff Tool</title>
+    <!-- diff2html library voor de visuele diff -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"></script>
+    <!-- jsdiff library, een dependency voor diff2html -->
+    <script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
+
+    <style>
+        /* Basis styling, geïnspireerd door uw voorbeeld */
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        main {
+            width: 90%;
+            max-width: 1200px;
+            margin-top: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        .input-section {
+            padding: 20px;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .input-section input[type="text"], .input-section input[type="file"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            flex-grow: 1;
+        }
+        .input-section input[type="submit"] {
+            padding: 8px 16px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .input-section input[type="submit"]:hover {
+            background-color: #4338ca;
+        }
+        #status {
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+        }
+        .error { color: #dc2626; }
+        .success { color: #16a34a; }
+
+        /* Styling voor de diff-output */
+        .d2h-file-header {
+            background-color: #374151;
+            color: white;
+        }
+        /* Oranje/geel voor gewijzigde regels */
+        .d2h-changed-line { background-color: #fef3c7 !important; }
+        .d2h-ins { background-color: #dcfce7 !important; }
+        .d2h-del { background-color: #fee2e2 !important; }
+    </style>
+</head>
+<body>
+
+    <main>
+        <h1>JSON Diff Vergelijkingstool</h1>
+        
+        <div class="input-section">
+            <label for="documentId">Document ID:</label>
+            <input type="text" id="documentId" placeholder="Voer ID in...">
+            
+            <label for="newJsonFile">Nieuw bestand:</label>
+            <input type="file" id="newJsonFile" accept=".json">
+            
+            <input type="submit" id="compareBtn" value="Vergelijk">
+        </div>
+        
+        <div id="status"></div>
+        
+        <!-- De diff-resultaten worden hier weergegeven -->
+        <div id="diff-output"></div>
+    </main>
+
+    <script>
+        const documentIdInput = document.getElementById('documentId');
+        const newJsonFileInput = document.getElementById('newJsonFile');
+        const compareBtn = document.getElementById('compareBtn');
+        const diffOutput = document.getElementById('diff-output');
+        const statusDiv = document.getElementById('status');
+
+        compareBtn.addEventListener('click', async () => {
+            const documentId = documentIdInput.value.trim();
+            const newFile = newJsonFileInput.files[0];
+
+            if (!documentId) {
+                showStatus('Fout: Voer a.u.b. een Document ID in.', 'error');
+                return;
+            }
+            if (!newFile) {
+                showStatus('Fout: Selecteer a.u.b. een nieuw JSON-bestand.', 'error');
+                return;
+            }
+
+            diffOutput.innerHTML = '';
+            showStatus('Bezig met vergelijken...', null);
+
+            try {
+                // Stap 1: Haal de "oude" JSON op van de backend API
+                const oldJsonResponse = await fetch(`http://localhost:8443/search-by-id?id=${documentId}`);
+                if (!oldJsonResponse.ok) {
+                    throw new Error(`Kon document met ID ${documentId} niet vinden (status: ${oldJsonResponse.status}).`);
+                }
+                const oldJsonData = await oldJsonResponse.json();
+                const oldDocument = oldJsonData.learnings && oldJsonData.learnings[0] ? oldJsonData.learnings[0].document : null;
+                if (!oldDocument) {
+                     throw new Error('De API-response bevat geen geldig "document"-veld.');
+                }
+                const oldJsonString = JSON.stringify(oldDocument, null, 2);
+
+                // Stap 2: Lees het "nieuwe" JSON-bestand
+                const newJsonStringRaw = await newFile.text();
+                const newJsonString = JSON.stringify(JSON.parse(newJsonStringRaw), null, 2);
+
+                // Stap 3: Genereer de diff patch
+                const diffPatch = Diff.createPatch('document.json', oldJsonString, newJsonString, 'Oude Versie (Database)', 'Nieuwe Versie (Upload)');
+
+                // Stap 4: Converteer de patch naar HTML
+                const diffHtml = Diff2Html.html(diffPatch, {
+                    drawFileList: false,
+                    matching: 'lines',
+                    outputFormat: 'side-by-side',
+                    renderNothingWhenEmpty: true
+                });
+
+                if (!diffHtml) {
+                     showStatus('Geen verschillen gevonden!', 'success');
+                } else {
+                    diffOutput.innerHTML = diffHtml;
+                    statusDiv.innerHTML = ''; // Leeg de status als er een resultaat is
+                }
+
+            } catch (error) {
+                console.error('Er is een fout opgetreden:', error);
+                showStatus(`Fout: ${error.message}`, 'error');
+            }
+        });
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = type || ''; // bv. 'error' of 'success'
+        }
+    </script>
+</body>
+</html>
+

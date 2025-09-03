@@ -1,8 +1,8 @@
 package com.uijthof.setu_diff.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.MapDifference;
-import com.google.common.collect.Maps;
+import com.flipkart.zjsonpatch.JsonDiff;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.uijthof.setu_diff.model.Learning;
@@ -62,62 +62,65 @@ public class MongoService {
     }
 
     public List<Map<String, Object>> diffJsonFiles(String id, MultipartFile newFile) throws IOException {
-        // Stap 1: Haal het oude document op
+        // Stap 1 & 2: Oude en nieuwe JSON ophalen
         Learning existingLearning = mongoRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Learning with id " + id + " not found"));
         Document oldDocument = existingLearning.getDocument();
         if (oldDocument == null) {
             throw new IllegalStateException("The existing document with id " + id + " does not contain JSON data.");
         }
-
-        // Stap 2: Lees het nieuwe JSON-bestand in
         if (newFile.isEmpty()) {
             throw new IllegalArgumentException("New json file is empty");
         }
-        String oldJsonContent = oldDocument.toJson();
-        String newJsonContent = new String(newFile.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 
-        // Stap 3: Converteer beide JSON-strings naar standaard Java Maps met Gson
-        Type type = new TypeToken<Map<String, Object>>() {}.getType();
-        Map<String, Object> oldMap = gson.fromJson(oldJsonContent, type);
-        Map<String, Object> newMap = gson.fromJson(newJsonContent, type);
+        // Stap 3: Converteer de BSON Document en het nieuwe bestand naar JsonNode objecten.
+        // Dit is de native manier voor de zjsonpatch bibliotheek.
+        JsonNode oldJsonNode = objectMapper.readTree(oldDocument.toJson());
+        JsonNode newJsonNode = objectMapper.readTree(newFile.getInputStream());
 
-        // Stap 4: Gebruik Guava's Maps.difference om de verschillen te vinden
-        MapDifference<String, Object> diff = Maps.difference(oldMap, newMap);
+        // Stap 4: Genereer de "JSON Patch". Dit is de diepe vergelijking.
+        JsonNode patch = JsonDiff.asJson(oldJsonNode, newJsonNode);
 
-        // Stap 5: Vertaal de verschillen naar een leesbaar formaat
+        // Stap 5: Vertaal de patch naar het door u gewenste, leesbare formaat
+        return convertPatchToCustomFormat(patch, oldJsonNode);
+    }
+
+    /**
+     * Hulp-methode om een standaard JSON Patch om te zetten naar een lijst
+     * met 'from' en 'to' waardes.
+     */
+    private List<Map<String, Object>> convertPatchToCustomFormat(JsonNode patch, JsonNode oldJsonNode) {
         List<Map<String, Object>> customDiffOutput = new ArrayList<>();
+        for (JsonNode operation : patch) {
+            Map<String, Object> diffDetail = new LinkedHashMap<>();
+            String op = operation.get("op").asText();
+            String path = operation.get("path").asText();
 
-        // Toegevoegde velden (alleen in de nieuwe map)
-        diff.entriesOnlyOnRight().forEach((key, value) -> {
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("operation", "add");
-            detail.put("path", "/" + key);
-            detail.put("from", null);
-            detail.put("to", value);
-            customDiffOutput.add(detail);
-        });
+            diffDetail.put("operation", op);
+            diffDetail.put("path", path);
 
-        // Verwijderde velden (alleen in de oude map)
-        diff.entriesOnlyOnLeft().forEach((key, value) -> {
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("operation", "remove");
-            detail.put("path", "/" + key);
-            detail.put("from", value);
-            detail.put("to", null);
-            customDiffOutput.add(detail);
-        });
-
-        // Gewijzigde velden
-        diff.entriesDiffering().forEach((key, valueDifference) -> {
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("operation", "replace");
-            detail.put("path", "/" + key);
-            detail.put("from", valueDifference.leftValue());
-            detail.put("to", valueDifference.rightValue());
-            customDiffOutput.add(detail);
-        });
-
+            switch (op) {
+                case "replace":
+                    // De patch bevat de nieuwe waarde ('value'). We zoeken de oude waarde op in het originele document.
+                    JsonNode oldValueNode = oldJsonNode.at(path);
+                    diffDetail.put("from", objectMapper.convertValue(oldValueNode, Object.class));
+                    diffDetail.put("to", objectMapper.convertValue(operation.get("value"), Object.class));
+                    break;
+                case "add":
+                    diffDetail.put("from", null);
+                    diffDetail.put("to", objectMapper.convertValue(operation.get("value"), Object.class));
+                    break;
+                case "remove":
+                    // De patch bevat geen waarde. We zoeken de verwijderde waarde op in het originele document.
+                    JsonNode removedValueNode = oldJsonNode.at(path);
+                    diffDetail.put("from", objectMapper.convertValue(removedValueNode, Object.class));
+                    diffDetail.put("to", null);
+                    break;
+            }
+            if (!diffDetail.isEmpty()) {
+                customDiffOutput.add(diffDetail);
+            }
+        }
         return customDiffOutput;
     }
 }
