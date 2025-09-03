@@ -8,9 +8,11 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Getter
 @Setter
 @Document(collection = "learning")
+
 public class Learning {
 
     @Id
+
     private String id;
 
     public String title;
@@ -18,4 +20,5 @@ public class Learning {
     public String  discription;
 
     private org.bson.Document document;
+
 }
