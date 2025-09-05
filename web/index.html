@@ -4,14 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSON Diff Tool</title>
-    <!-- diff2html library voor de visuele diff -->
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"></script>
-    <!-- jsdiff library, een dependency voor diff2html -->
-    <script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="diff2html.min.css" />
+    <script type="text/javascript" src="diff2html.min.js"></script>
+    <script src="diff.min.js"></script>
 
     <style>
-        /* Basis styling, geïnspireerd door uw voorbeeld */
         body {
             font-family: sans-serif;
             display: flex;
@@ -64,12 +61,10 @@
         .error { color: #dc2626; }
         .success { color: #16a34a; }
 
-        /* Styling voor de diff-output */
         .d2h-file-header {
             background-color: #374151;
             color: white;
         }
-        /* Oranje/geel voor gewijzigde regels */
         .d2h-changed-line { background-color: #fef3c7 !important; }
         .d2h-ins { background-color: #dcfce7 !important; }
         .d2h-del { background-color: #fee2e2 !important; }
@@ -92,7 +87,6 @@
         
         <div id="status"></div>
         
-        <!-- De diff-resultaten worden hier weergegeven -->
         <div id="diff-output"></div>
     </main>
 
@@ -120,8 +114,7 @@
             showStatus('Bezig met vergelijken...', null);
 
             try {
-                // Stap 1: Haal de "oude" JSON op van de backend API
-                const oldJsonResponse = await fetch(`http://localhost:8443/search-by-id?id=${documentId}`);
+                const oldJsonResponse = await fetch(`http://192.168.178.170:8443/search-by-id?id=${documentId}`);
                 if (!oldJsonResponse.ok) {
                     throw new Error(`Kon document met ID ${documentId} niet vinden (status: ${oldJsonResponse.status}).`);
                 }
@@ -132,14 +125,11 @@
                 }
                 const oldJsonString = JSON.stringify(oldDocument, null, 2);
 
-                // Stap 2: Lees het "nieuwe" JSON-bestand
                 const newJsonStringRaw = await newFile.text();
                 const newJsonString = JSON.stringify(JSON.parse(newJsonStringRaw), null, 2);
 
-                // Stap 3: Genereer de diff patch
                 const diffPatch = Diff.createPatch('document.json', oldJsonString, newJsonString, 'Oude Versie (Database)', 'Nieuwe Versie (Upload)');
 
-                // Stap 4: Converteer de patch naar HTML
                 const diffHtml = Diff2Html.html(diffPatch, {
                     drawFileList: false,
                     matching: 'lines',
@@ -151,7 +141,7 @@
                      showStatus('Geen verschillen gevonden!', 'success');
                 } else {
                     diffOutput.innerHTML = diffHtml;
-                    statusDiv.innerHTML = ''; // Leeg de status als er een resultaat is
+                    statusDiv.innerHTML = '';
                 }
 
             } catch (error) {
@@ -162,9 +152,8 @@
 
         function showStatus(message, type) {
             statusDiv.textContent = message;
-            statusDiv.className = type || ''; // bv. 'error' of 'success'
+            statusDiv.className = type || '';
         }
     </script>
 </body>
 </html>
-

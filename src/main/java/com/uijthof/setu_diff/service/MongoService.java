@@ -68,7 +68,6 @@ public class MongoService {
 
     }
 
-    // alleen God en Google Gemini weet hoe dit werkt :(
     public List<Map<String, Object>> diffJsonFiles(String id, MultipartFile newFile) throws IOException {
 
         Learning existingLearning = mongoRepo.findById(id).orElseThrow(() -> new RuntimeException("Learning with id " + id + " not found"));
@@ -93,7 +92,6 @@ public class MongoService {
 
     }
 
-    //deze code zie ik in mijn nachtmerrie's
     private List<Map<String, Object>> convertPatchToCustomFormat(JsonNode patch, JsonNode oldJsonNode) {
 
         List<Map<String, Object>> customDiffOutput = new ArrayList<>();
